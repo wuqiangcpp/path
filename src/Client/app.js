@@ -42,8 +42,10 @@ window.onload = function() {
     var debugShow=document.getElementById('debug');
 
 
-    var username=getParameter("user");//randomStr(6);//"wuqiang";
+    //var username=getParameter("user");//randomStr(6);//"wuqiang";
+    var username=randomStr(6);    
     var server='ws://222.29.69.203:5000';
+    //debugShow.innerHTML=JSON.stringify(username);    
     
     // Create a new WebSocket.
     var socket = new WebSocket(server);
@@ -96,48 +98,48 @@ window.onload = function() {
     // Handle messages sent by the server.
     socket.onmessage = function(event) {
 	var message = event.data;
-	//	debugShow.innerHTML=JSON.stringify(message);
-	if(message=="died")
+	var obj=JSON.parse(message);
+	//debugShow.innerHTML=JSON.stringify(message);
+	if(obj.msgType=="textMsg")
 	{
-	    if(!prompt)
+	    if(obj.msg=="Died")
 	    {
-		prompt=true;
-		var newLife=confirm("New Life");
-		if(newLife)
+		if(!prompt)
 		{
-		    var New = {
-			kind: "command",
-			command: "New"
-		    };
-		    socket.send(JSON.stringify(New) );
-		    window.location.reload();
+		    prompt=true;
+		    var newLife=confirm("New Life");
+		    if(newLife)
+		    {
+			var New = {
+			    msgType: "textMsg",
+			    msg: "New"
+			};
+			socket.send(JSON.stringify(New) );
+			window.location.reload();
+		    }
 		}
 	    }
 	}
-	else
+	else if(obj.msgType=="delete" )
 	{
-	    var obj=JSON.parse(message);
-	    var dis=150;
-	    if(obj.kind=="person")
-	    {
-		var I=positions[username];		
-		var pos=obj.pos;
-		var lastPos=obj.lastPos;
-		if( (obj.user!=username) && obj.label=="delete" )
-		{
-		    delete positions[obj.user];
-		    delete lastPositions[obj.user];
-		}
-		else
-		{
-		    positions[obj.user]=pos;
-		    lastPositions[obj.user]=lastPos;
-		}
-	    }
-	    else if(obj.kind=="path")
-	    {
-		paths.push({start:obj.start,end:obj.end});
-	    }
+	    var usr=obj.msg;
+//	    debugShow.innerHTML=JSON.stringify(message);	    
+	    delete positions[usr];
+	    delete lastPositions[usr];
+	}
+	else if(obj.msgType=="clientMsg")
+	{
+	    var msg=obj.msg
+	    var I=positions[username];		
+	    var pos=msg.pos;
+	    var lastPos=msg.lastPos;
+	    positions[msg.user]=pos;
+	    lastPositions[msg.user]=lastPos;
+	}
+	else if(obj.msgType=="pathMsg")
+	{
+	    var path=obj.msg	    
+	    paths.push({start:path.start,end:path.end});
 	}
 //	debugShow.innerHTML=JSON.stringify(lastPositions);		
 //	debugShow.innerHTML+=JSON.stringify(positions);	
@@ -188,32 +190,34 @@ window.onload = function() {
 
     // 	return false;
     // };
-
+    var width=350;//document.documentElement.clientWidth;
+    var height=550;//document.documentElement.clientHeight;
     var canvas = document.getElementById('map');
+    canvas.width=width;
+    canvas.height=height;
+    canvas.style.backgroundColor="#6d747f";
     var moving = false;
     var mousePos = { x:0, y:0 };
     var lastPos=mousePos;
-    var direction=[1,0];
-    var v=0.5;
-    var width=300;
-    var height=300;
-    //var lastPos = mousePos;
+//    var turnAngle=0;
+    var direction=[0,0];
+    var v=1;
     canvas.addEventListener("mousedown", function (e) {
         moving = true;
 	mousePos = getMousePos(canvas, e);
 	var dx=mousePos.x-width/2;
 	var dy=mousePos.y-height/2;
 	var dm=Math.sqrt(dx*dx+dy*dy);
-	direction[0]=dx/dm;
-	direction[1]=dy/dm;
+	var new_direction=[dx/dm,dy/dm];
+	direction=new_direction;
 	lastPos.x=positions[username][0];
 	lastPos.y=positions[username][1];
     }, false);
     canvas.addEventListener("mouseup", function (e) {
 	moving = false;
 	var Stop = {
-	       kind: "command",
-	       command: "Stop"	};
+	       msgType: "textMsg",
+	       msg: "Stop"	};
 	socket.send(JSON.stringify(Stop));
     }, false);
     // canvas.addEventListener("mousemove", function (e) {
@@ -288,33 +292,38 @@ window.onload = function() {
     
 
     
-
-    var sun = new Image();
-    var moon = new Image();
-    var earth = new Image();
+    var lastDrawTime;
+    // var sun = new Image();
+    // var moon = new Image();
+    // var earth = new Image();
     function init() {
-	sun.src = './pen.jpeg';
-	moon.src = './pen.jpeg';
-	earth.src = './pen.jpeg';
+	// sun.src = './pen.jpeg';
+	// moon.src = './pen.jpeg';
+	// earth.src = './pen.jpeg';
 	// var x=Math.floor((Math.random() * 300) + 1)-150;
 	// var y=Math.floor((Math.random() * 300) + 1)-150;
 	// positions[username]=[x,y];
+	lastDrawTime=performance.now();
 	window.requestAnimationFrame(draw);
     }
-    function draw() {
+    function draw(now) {
+	var elapsed = now - lastDrawTime;
+	debugShow.innerHTML=JSON.stringify(elapsed);	
+
 	var ctx = canvas.getContext('2d');
-	ctx.fillStyle = "blue";
+
 //	ctx.globalCompositeOperation = 'destination-over';
 	ctx.clearRect(0, 0, width, height); // clear canvas
 
-	ctx.strokeStyle = "blue";
-	ctx.lineWith = 2;
 	
 //	ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
 //	ctx.strokeStyle = 'rgba(0, 153, 255, 0.4)';
 	ctx.save();
 	ctx.translate(width/2, height/2);
-
+	var lineWidth=20;
+	ctx.fillStyle = "blue";		
+	ctx.lineWidth = lineWidth;
+	ctx.strokeStyle = "blue";	
 	// Earth
 	// var time = new Date();
 	// ctx.rotate(((2 * Math.PI) / 60) * time.getSeconds() + ((2 * Math.PI) / 60000) * time.getMilliseconds());
@@ -325,16 +334,17 @@ window.onload = function() {
 
 	if(moving)
 	{
-	    positions[username][0]+=direction[0]*v;
-	    positions[username][1]+=direction[1]*v;
+	    positions[username][0]+=direction[0]*v*elapsed/40;
+	    positions[username][1]+=direction[1]*v*elapsed/40;
 	    var pos = {
-		kind: "person",
-		label:"",
-    		user: username,
-//		birth:{s:0,ns:0},
-//		life:0,
-		pos: positions[username],
-//		lastPos:(0,0)
+		msgType:"clientMsg",
+		msg:{
+    		    user: username,
+		    //		birth:{s:0,ns:0},
+		    //		life:0,
+		    pos: positions[username]
+		    //		lastPos:(0,0)
+		}
     	    };
     	    socket.send(JSON.stringify(pos) );
 
@@ -346,19 +356,20 @@ window.onload = function() {
 	}
 	
 	var I=positions[username];
-//	I=[0,0];
-//	ctx.fillRect(0,0,10,10);	
 	for(var key in positions)
 	{
 	    if(positions[key]&&lastPositions[key])
 	    {
-	    // if(key!=username)
-		// {
 		var x=positions[key][0]-I[0];
 		var y=positions[key][1]-I[1];
 		ctx.fillRect(x-5,y-5,10,10);
-	    //	    }
-
+		ctx.beginPath();
+		ctx.save();
+		ctx.lineWidth=0;
+		ctx.arc(lastPositions[key][0]-I[0],lastPositions[key][1]-I[1],lineWidth/2,0,2*Math.PI,false);
+		ctx.fill();		
+		ctx.restore();
+		
 		ctx.beginPath();
 		ctx.moveTo(lastPositions[key][0]-I[0], lastPositions[key][1]-I[1]);
 		ctx.lineTo(positions[key][0]-I[0], positions[key][1]-I[1]);
@@ -373,6 +384,13 @@ window.onload = function() {
 		var start=paths[key]["start"];
 		var end=paths[key]["end"];
 		ctx.beginPath();
+		ctx.save();
+		ctx.lineWidth=0;
+		ctx.arc(start[0]-I[0],start[1]-I[1],lineWidth/2,0,2*Math.PI,false);
+		ctx.fill();		
+		ctx.restore();
+		
+		ctx.beginPath();		
 		ctx.moveTo(start[0]-I[0], start[1]-I[1]);
 		ctx.lineTo(end[0]-I[0], end[1]-I[1]);
 		ctx.stroke();
@@ -393,7 +411,7 @@ window.onload = function() {
 	// ctx.stroke();
 	
 //	ctx.drawImage(sun, 0, 0, 300, 300);
-
+	lastDrawTime=performance.now();;
 	window.requestAnimationFrame(draw);
     }
     init();   
